@@ -13,9 +13,10 @@
 const uint8_t         APP_ADDR            = 1;
 const int             WRN_PIN             = 6;
 const int             STATUS_PIN          = 9;
-const int             STATUS_TIMEOUT_MS   = 200;
-const int             REPORT_TIMEOUT_MS   = 4000;
-const int             DISPLAY_TIMEOUT_MS  = 500;
+const unsigned long   STATUS_TIMEOUT_MS   = 200;
+const unsigned long   REPORT_TIMEOUT_MS   = 8000;
+const unsigned long   DISPLAY_TIMEOUT_MS  = 1000;
+const unsigned long   GPS_TIMEOUT_MS      = 3000;
 const float           VBTY_FULL           = 4.10;    ///< full charge level
 const int             BAD_TX_COUNT        = 5;
 
@@ -23,6 +24,7 @@ const int             BAD_TX_COUNT        = 5;
 // globals
 AppState            state;
 int                 msgTxCount = 0;
+
 
 
 // updates application state (read voltages, etc.)
@@ -63,15 +65,15 @@ void reportAppState()
       Serial.print(", pwr=");
       Serial.print(state.m_bPowerOn ? "yes" : "no");
       Serial.print(", bty=");
-      Serial.print(state.m_fVbty);
+      Serial.print(state.m_fVbty, 2);
       Serial.print(", vcc=");
-      Serial.print(state.m_fVcc);
+      Serial.print(state.m_fVcc, 2);
       Serial.print(", lat=");
-      Serial.print(state.m_fLatitudeDeg);
+      Serial.print(state.m_fLatitudeDeg, 4);
       Serial.print(", lon=");
-      Serial.print(state.m_fLongitudeDeg);
+      Serial.print(state.m_fLongitudeDeg, 4);
       Serial.print(", alt=");
-      Serial.print(state.m_fAltitudeM);
+      Serial.print(state.m_fAltitudeM, 2);
       Serial.print(", fix=");
       Serial.print(state.m_bGoodGpsFix);
       Serial.print(", t=");
@@ -84,11 +86,10 @@ void reportAppState()
   if (millis() > uDisplayTimeoutMs)
   {
     uDisplayTimeoutMs += DISPLAY_TIMEOUT_MS;
-    
-    display.clearDisplay();
-    display.setCursor(0,0);
+
+    clearDisplay();
     displayMsg(state);  
-    display.display();
+    refreshDisplay();
   }
 }
 
@@ -123,6 +124,26 @@ void readLora()
 /// read and process GPS data
 void readGps()
 {
+  static unsigned long uGpsTimeoutMs = GPS_TIMEOUT_MS;
+  static bool gpsGood = false;
+  static bool gpsEnabled = false;
+
+  // power GPS off and on
+  if ( (gpsGood == false) &&
+       (millis() > uGpsTimeoutMs) )
+  {
+    gpsEnabled = true;
+  }
+  else if ( (gpsEnabled == true) &&
+            (gpsGood == true) )
+  {
+    gpsEnabled = false;
+    gpsGood = false;
+    uGpsTimeoutMs = millis() + GPS_TIMEOUT_MS;
+  }
+
+  gpsOn(gpsEnabled);  
+
   static NmeaLocation location;
   if (readLocation(location) == true)
   {
@@ -130,7 +151,9 @@ void readGps()
     state.m_fLatitudeDeg = location.m_fLatitudeDeg;
     state.m_fLongitudeDeg = location.m_fLongitudeDeg;
     state.m_fAltitudeM = location.m_fAltitudeM;
-    state.m_bGoodGpsFix = location.m_bGoodMsg;    
+    state.m_bGoodGpsFix = location.m_bGoodMsg;
+
+    gpsGood |= location.m_bGoodMsg && gpsEnabled;
   }
 }
 

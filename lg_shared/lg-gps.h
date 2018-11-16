@@ -1,15 +1,24 @@
 
+#ifndef LG_GPS_H
+#define LG_GPS_H
+
+
 #include <SoftwareSerial.h>
 #include "lg-msg.h"
+#include "lg-blink.h"
+
 
 
 // constants
-const int       GPS_SERIAL_RX_PIN   = 11;
-const int       GPS_SERIAL_TX_PIN   = 12;
+const int               GPS_SERIAL_RX_PIN   = 11;
+const int               GPS_SERIAL_TX_PIN   = 12;
+const int               GPS_ENABLE_PIN      = 20;
+const unsigned long     GPS_ENABLE_TIMEOUT  = 2000;
 
 
 // globals
 SoftwareSerial      gpsSerial(GPS_SERIAL_RX_PIN, GPS_SERIAL_TX_PIN);   // RX, TX
+
 
 
 struct NmeaLocation
@@ -33,6 +42,9 @@ struct NmeaLocation
 /// setup GPS pins, etc.
 bool setupGps()
 {
+    pinMode(GPS_ENABLE_PIN, OUTPUT);
+    digitalWrite(GPS_ENABLE_PIN, LOW);
+    
     gpsSerial.begin(9600);
     return true;
 }
@@ -181,3 +193,26 @@ bool readLocation(NmeaLocation &_location)
     
     return bSuccess;
 }
+
+
+bool gpsOn(bool _bState)
+{
+    // set pin output (with timeout)
+    tickOutput(GPS_ENABLE_TIMEOUT, GPS_ENABLE_PIN, _bState, false);
+}
+
+
+void gpsEcho()
+{
+    if (gpsSerial.available() > 0)
+    {
+        Serial.write(gpsSerial.read());
+    }
+    
+    if (Serial.available() > 0)
+    {
+        gpsSerial.write(Serial.read());
+    }
+}
+
+#endif // #ifndef LG_GPS_H

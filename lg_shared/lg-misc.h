@@ -1,4 +1,8 @@
 
+#ifndef LG_MISC_H
+#define LG_MISC_H
+
+
 
 
 int freeRam()
@@ -9,3 +13,4 @@ int freeRam()
 }
 
 
+#endif  // #ifndef LG_LORA_H

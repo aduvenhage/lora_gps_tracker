@@ -1,4 +1,8 @@
 
+#ifndef LG_LORA_H
+#define LG_LORA_H
+
+
 #include <RH_RF95.h>
 #include <SPI.h>
 #include "lg-msg.h"
@@ -53,6 +57,7 @@ void sendRadioMsg(msg_type &_msg, uint8_t _uSrcAddr, uint8_t _uDstAddr)
   _msg.m_uDstAddr = _uDstAddr;
   
   radio.send((uint8_t*)&_msg, sizeof(_msg));
+  radio.waitPacketSent();
   radio.setModeRx();
 }
 
@@ -105,3 +110,5 @@ bool getRadioMsg(msg_type &_msg, uint8_t _uSize)
 }
 
 
+
+#endif // #ifndef LG_LORA_H

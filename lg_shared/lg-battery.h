@@ -1,5 +1,9 @@
 
 
+#ifndef LG_BATTERY_H
+#define LG_BATTERY_H
+
+
 
 // constants
 const int             BTY_APIN            = 1;
@@ -50,3 +54,4 @@ float readSupplyVoltage()
 }
 
 
+#endif  // #ifndef LG_BATTERY_H

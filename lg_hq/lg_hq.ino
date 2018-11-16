@@ -1,7 +1,10 @@
 
+
 #include <lg-blink.h>
 #include <lg-lora.h>
+#include <lg-gps.h>
 #include <lg-misc.h>
+
 
 
 // constants
@@ -45,15 +48,15 @@ void readLora()
           Serial.print(", pwr=");
           Serial.print(state.m_bPowerOn ? "yes" : "no");
           Serial.print(", bty=");
-          Serial.print(state.m_fVbty);
+          Serial.print(state.m_fVbty, 2);
           Serial.print(", vcc=");
-          Serial.print(state.m_fVcc);
+          Serial.print(state.m_fVcc, 2);
           Serial.print(", lat=");
-          Serial.print(state.m_fLatitudeDeg);
+          Serial.print(state.m_fLatitudeDeg, 4);
           Serial.print(", lon=");
-          Serial.print(state.m_fLongitudeDeg);
+          Serial.print(state.m_fLongitudeDeg, 4);
           Serial.print(", alt=");
-          Serial.print(state.m_fAltitudeM);
+          Serial.print(state.m_fAltitudeM, 2);
           Serial.print(", fix=");
           Serial.print(state.m_bGoodGpsFix);
           Serial.print(", t=");
@@ -78,8 +81,9 @@ void setup()
   // setup serial
   Serial.begin(19200);
   
-  // setup LoRa
+  // setup peripherals
   setupRadio();
+  setupGps();
 }
 
 

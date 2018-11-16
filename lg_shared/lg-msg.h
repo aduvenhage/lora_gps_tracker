@@ -2,6 +2,8 @@
 #ifndef LG_MSG_H
 #define LG_MSG_H
 
+
+
 // constants
 const uint8_t         RFPROTO_ID          = 42;       //< unique protocol ID
 const uint8_t         RFADDR_HQ           = 0;       //< gateway address

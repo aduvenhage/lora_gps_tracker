@@ -1,11 +1,14 @@
 
+#ifndef LG_BLINK_H
+#define LG_BLINK_H
+
 
 
 // blink any pin (50% duty cycle) -- function should be called from main loop to update state
 void blink(unsigned long _uTimeMs, int _iPin)
 {
   static unsigned long uLoopExpireTime[14] = {0};
-  static bool bLoopLedOn[14] = {false};
+  static bool bLoopLedOn[24] = {false};
   
   if (millis() > uLoopExpireTime[_iPin])
   {
@@ -20,7 +23,7 @@ void blink(unsigned long _uTimeMs, int _iPin)
 void flash(unsigned long _uTimeMs, int _iPin)
 {
   static unsigned long uLoopExpireTime[14] = {0};
-  static bool bLoopLedOn[14] = {false};
+  static bool bLoopLedOn[24] = {false};
   
   if (millis() > uLoopExpireTime[_iPin])
   {
@@ -35,7 +38,7 @@ void flash(unsigned long _uTimeMs, int _iPin)
 void tickOutput(unsigned long _uTimeMs, int _iPin, bool _bOutput, bool _bInverted)
 {
   static unsigned long uLoopExpireTime[14] = {0};
-  static bool bLoopLedOn[14] = {false};
+  static bool bLoopLedOn[24] = {false};
 
   if (_bOutput == true)
   {
@@ -57,3 +60,6 @@ void tickOutput(unsigned long _uTimeMs, int _iPin, bool _bOutput, bool _bInverte
   }
 }
 
+
+
+#endif      // #ifndef LG_BLINK_H
