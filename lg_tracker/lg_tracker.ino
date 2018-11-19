@@ -14,11 +14,11 @@ const uint8_t         APP_ADDR            = 1;
 const int             WRN_PIN             = 6;
 const int             STATUS_PIN          = 9;
 const unsigned long   STATUS_TIMEOUT_MS   = 200;
-const unsigned long   REPORT_TIMEOUT_MS   = 8000;
-const unsigned long   DISPLAY_TIMEOUT_MS  = 1000;
-const unsigned long   GPS_TIMEOUT_MS      = 3000;
+const unsigned long   REPORT_TIMEOUT_MS   = 10000;
+const unsigned long   DISPLAY_TIMEOUT_MS  = 2000;
+const unsigned long   GPS_TIMEOUT_MS      = 30000;
 const float           VBTY_FULL           = 4.10;    ///< full charge level
-const int             BAD_TX_COUNT        = 5;
+const int             BAD_TX_COUNT        = 4;
 
 
 // globals
@@ -127,12 +127,14 @@ void readGps()
   static unsigned long uGpsTimeoutMs = GPS_TIMEOUT_MS;
   static bool gpsGood = false;
   static bool gpsEnabled = false;
+  static int  gpsMsgCount = 0;
 
   // power GPS off and on
   if ( (gpsGood == false) &&
        (millis() > uGpsTimeoutMs) )
   {
     gpsEnabled = true;
+    gpsMsgCount = 0;
   }
   else if ( (gpsEnabled == true) &&
             (gpsGood == true) )
@@ -142,18 +144,27 @@ void readGps()
     uGpsTimeoutMs = millis() + GPS_TIMEOUT_MS;
   }
 
-  gpsOn(gpsEnabled);  
+  // NOTE: circuit has a PNP resistor controlling power to GPS
+  gpsOn(!gpsEnabled);  
 
   static NmeaLocation location;
   if (readLocation(location) == true)
   {
-    state.m_uGpsTimeS = (unsigned long)location.m_iTimeS;
-    state.m_fLatitudeDeg = location.m_fLatitudeDeg;
-    state.m_fLongitudeDeg = location.m_fLongitudeDeg;
-    state.m_fAltitudeM = location.m_fAltitudeM;
-    state.m_bGoodGpsFix = location.m_bGoodMsg;
-
-    gpsGood |= location.m_bGoodMsg && gpsEnabled;
+    if (location.m_bGoodMsg == true)
+    {
+      state.m_bGoodGpsFix = true;
+      state.m_uGpsTimeS = (unsigned long)location.m_iTimeS;
+      state.m_fLatitudeDeg = location.m_fLatitudeDeg;
+      state.m_fLongitudeDeg = location.m_fLongitudeDeg;
+      state.m_fAltitudeM = location.m_fAltitudeM;
+      gpsGood = true;
+    }
+    else if (gpsMsgCount > 16)
+    {
+      state.m_bGoodGpsFix = false;
+    }
+        
+    gpsMsgCount++;
   }
 }
 
