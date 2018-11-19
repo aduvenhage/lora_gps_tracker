@@ -14,7 +14,7 @@ const uint8_t         APP_ADDR            = 1;
 const int             WRN_PIN             = 6;
 const int             STATUS_PIN          = 9;
 const unsigned long   STATUS_TIMEOUT_MS   = 200;
-const unsigned long   REPORT_TIMEOUT_MS   = 10000;
+const unsigned long   REPORT_TIMEOUT_MS   = 15000;
 const unsigned long   DISPLAY_TIMEOUT_MS  = 2000;
 const unsigned long   GPS_TIMEOUT_MS      = 30000;
 const float           VBTY_FULL           = 4.10;    ///< full charge level
@@ -205,7 +205,7 @@ void loop()
   }
   else if (state.m_bPowerOn == false)
   {
-    digitalWrite(WRN_PIN, HIGH);
+    flash(1000, WRN_PIN);
   }
   else if (state.m_bCharging == true)
   {
