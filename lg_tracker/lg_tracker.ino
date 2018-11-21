@@ -150,10 +150,14 @@ void readGps()
   static NmeaLocation location;
   if (readLocation(location) == true)
   {
+    if (location.m_iTimeS > 0)
+    {
+      state.m_uGpsTimeS = (unsigned long)location.m_iTimeS;
+    }
+      
     if (location.m_bGoodMsg == true)
     {
       state.m_bGoodGpsFix = true;
-      state.m_uGpsTimeS = (unsigned long)location.m_iTimeS;
       state.m_fLatitudeDeg = location.m_fLatitudeDeg;
       state.m_fLongitudeDeg = location.m_fLongitudeDeg;
       state.m_fAltitudeM = location.m_fAltitudeM;
@@ -201,15 +205,19 @@ void loop()
   // update WRN LED
   if (state.m_bBadLink == true)
   {
-    blink(100, WRN_PIN);
+    blink(1000, WRN_PIN);
   }
   else if (state.m_bPowerOn == false)
   {
-    flash(1000, WRN_PIN);
+    flash(2000, WRN_PIN);
   }
   else if (state.m_bCharging == true)
   {
     blink(1000, WRN_PIN);
+  }
+  else if (state.m_bPowerOn == true)
+  {
+    digitalWrite(WRN_PIN, HIGH);
   }
   else
   {
