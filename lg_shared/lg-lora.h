@@ -41,9 +41,9 @@ bool setupRadio()
     
   if (bSuccess == true)
   {
-    // setup LoRa (setup freq and power)
     radio.setFrequency(RF95_FREQ);
     radio.setTxPower(23, false);
+    radio.setModemConfig(RH_RF95::Bw125Cr48Sf4096);
   }
 
   return bSuccess;
@@ -62,7 +62,7 @@ void sendRadioMsg(msg_type &_msg, uint8_t _uSrcAddr, uint8_t _uDstAddr)
 }
 
 
-uint8_t recvRadioMsg(uint8_t &_uSrcAddr, uint8_t &_uDstAddr)
+uint8_t recvRadioMsg(uint8_t &_uSrcAddr, uint8_t &_uDstAddr, int &_iSnr)
 {
   uint8_t n = 0;
 
@@ -74,7 +74,8 @@ uint8_t recvRadioMsg(uint8_t &_uSrcAddr, uint8_t &_uDstAddr)
     {
       uint8_t uProtoId = radioBuffer[0];
       _uSrcAddr = radioBuffer[1]; 
-      _uDstAddr = radioBuffer[2]; 
+      _uDstAddr = radioBuffer[2];
+      _iSnr = radio.lastSNR();
 
       if (uProtoId != RFPROTO_ID)
       {
@@ -85,7 +86,6 @@ uint8_t recvRadioMsg(uint8_t &_uSrcAddr, uint8_t &_uDstAddr)
       
   return n;
 }
-
 
 template <typename msg_type>
 bool checkRadioMsgType(uint8_t _uSize)

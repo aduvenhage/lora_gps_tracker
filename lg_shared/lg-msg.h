@@ -10,6 +10,11 @@ const uint8_t         RFADDR_HQ           = 0;       //< gateway address
 const uint8_t         RFADDR_BRDCST       = 255;     //< broadcast address
 
 
+const uint8_t   APP_FLAG_CHARGING   = 1;
+const uint8_t   APP_FLAG_POWERON    = 2;
+const uint8_t   APP_FLAG_GPSFIX     = 4;
+const uint8_t   APP_FLAG_BADLINK    = 8;
+
 
 #pragma pack(push)
 #pragma pack(1)
@@ -19,31 +24,29 @@ struct AppState
     :m_uProtoId(RFPROTO_ID),
      m_uSrcAddr(0),
      m_uDstAddr(0),
-     m_uGpsTimeS(0),
      m_fVbty(0),
-     m_fVcc(0),
      m_fLatitudeDeg(0),
      m_fLongitudeDeg(0),
-     m_fAltitudeM(0),
-     m_bCharging(false),
-     m_bPowerOn(false),
-     m_bGoodGpsFix(false),
-     m_bBadLink(false)
+     m_uFlags(0)
+  {}
+
+  AppState(uint8_t _uSrcAddr, uint8_t _uDstAddr)
+    :m_uProtoId(RFPROTO_ID),
+     m_uSrcAddr(_uSrcAddr),
+     m_uDstAddr(_uDstAddr),
+     m_fVbty(0),
+     m_fLatitudeDeg(0),
+     m_fLongitudeDeg(0),
+     m_uFlags(0)
   {}
 
   uint8_t         m_uProtoId;
   uint8_t         m_uSrcAddr;
   uint8_t         m_uDstAddr;
-  unsigned long   m_uGpsTimeS;
   float           m_fVbty;
-  float           m_fVcc;
   float           m_fLatitudeDeg;
   float           m_fLongitudeDeg;
-  float           m_fAltitudeM;
-  bool            m_bCharging;
-  bool            m_bPowerOn;
-  bool            m_bGoodGpsFix;
-  bool            m_bBadLink;
+  uint8_t         m_uFlags;
 };
 #pragma pack(pop)
 
@@ -55,14 +58,18 @@ struct HqResponse
     HqResponse()
         :m_uProtoId(RFPROTO_ID),
          m_uSrcAddr(0),
-         m_uDstAddr(0),
-         m_uTimeMs(0)
+         m_uDstAddr(0)
     {}
-    
+
+    HqResponse(uint8_t _uSrcAddr, uint8_t _uDstAddr)
+        :m_uProtoId(RFPROTO_ID),
+         m_uSrcAddr(_uSrcAddr),
+         m_uDstAddr(_uDstAddr)
+    {}
+
     uint8_t         m_uProtoId;
     uint8_t         m_uSrcAddr;
     uint8_t         m_uDstAddr;
-    unsigned long   m_uTimeMs;
 };
 #pragma pack(pop)
 

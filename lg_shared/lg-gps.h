@@ -104,7 +104,7 @@ bool decodeNmeaGpgga(NmeaLocation &_location, const char *_pszNmea, int n)
     bool bSuccess = false;
     
     if ( (n > 25) &&
-        (strncmp(_pszNmea+3, "GGA", 3) == 0) )
+         (strncmp(_pszNmea+3, "GGA", 3) == 0) )
     {
         const char *pCh = _pszNmea;
         int count = 0;

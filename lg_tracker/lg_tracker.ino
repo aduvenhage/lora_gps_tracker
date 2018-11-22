@@ -7,141 +7,195 @@
 #include "lg-gps.h"
 #include "lg-misc.h"
 
+#include <avr/wdt.h>
+
 
 
 // constants
-const uint8_t         APP_ADDR            = 1;
+const uint8_t         APP_ADDR            = 8;
 const int             WRN_PIN             = 6;
 const int             STATUS_PIN          = 9;
-const unsigned long   STATUS_TIMEOUT_MS   = 200;
-const unsigned long   REPORT_TIMEOUT_MS   = 15000;
-const unsigned long   DISPLAY_TIMEOUT_MS  = 2000;
-const unsigned long   GPS_TIMEOUT_MS      = 30000;
-const float           VBTY_FULL           = 4.10;    ///< full charge level
-const int             BAD_TX_COUNT        = 4;
+const unsigned long   STATUS_TIMEOUT_MS   = 200;      ///< how long radio/status pin will stay on for
+const unsigned long   REPORT_TIMEOUT_MS   = 15000;    ///< time between radio reports
+const unsigned long   GPS_TIMEOUT_MS      = 45000;    ///< time between GPS checks
+const unsigned long   RX_TIMEOUT_MS       = 4000;     ///< time to wait for HQ response
+const float           VBTY_FULL           = 4.10;     ///< full charge level
+const uint8_t         BAD_TX_COUNT        = 4;        ///< number of times HQ response may fail 
 
 
 // globals
-AppState            state;
-int                 msgTxCount = 0;
+float               fVbty = 0;
+float               fVcc = 0;
+float               fLongitudeDeg = 0;
+float               fLatitudeDeg = 0;
+bool                bPowerOn = false;
+bool                bCharging = false;
+bool                bBadLink = false;
+bool                bGoodGpsFix = false;
+unsigned long       uGpsTimeS = 0;
+uint8_t             uTxCount = 0;
 
 
+
+
+// Interrupt is called once a millisecond -- maintain output LEDs
+SIGNAL(TIMER0_COMPA_vect) 
+{
+  static unsigned long count = 0;
+  if (count % 10)
+  {
+    // update WRN LED
+    if (bBadLink == true)
+    {
+      blink(200, WRN_PIN);
+    }
+    else if (bPowerOn == false)
+    {
+      flash(2000, WRN_PIN);
+    }
+    else if (bCharging == true)
+    {
+      blink(1000, WRN_PIN);
+    }
+    else if (bPowerOn == true)
+    {
+      digitalWrite(WRN_PIN, HIGH);
+    }
+    else
+    {
+      digitalWrite(WRN_PIN, LOW);
+    }
+    
+    tickOutput(0, STATUS_PIN, false, false);
+  }
+  
+  count++;
+}
+
+
+AppState buildAppState()
+{
+  AppState state;
+  
+  state.m_fVbty = fVbty;
+  state.m_fLatitudeDeg = fLatitudeDeg;
+  state.m_fLongitudeDeg = fLongitudeDeg;
+  state.m_uFlags |= bCharging ? APP_FLAG_CHARGING : 0;
+  state.m_uFlags |= bPowerOn ? APP_FLAG_POWERON : 0;
+  state.m_uFlags |= bGoodGpsFix ? APP_FLAG_GPSFIX : 0;
+  state.m_uFlags |= bBadLink ? APP_FLAG_BADLINK : 0;
+
+  return state;
+}
 
 // updates application state (read voltages, etc.)
 void updateAppState()
 {
-  state.m_fVbty = readBatteryVoltage();
-  state.m_fVcc = readSupplyVoltage();
-  state.m_bPowerOn = state.m_fVcc > state.m_fVbty + 0.2;
-  state.m_bBadLink = msgTxCount > BAD_TX_COUNT;
-
-  const float fVbtyFull = state.m_bCharging ? VBTY_FULL : (VBTY_FULL-0.02);
-  state.m_bCharging = (state.m_bPowerOn == true) && (state.m_fVbty < fVbtyFull);
+  const float fVbtyFull = bCharging ? VBTY_FULL : (VBTY_FULL-0.1);
+  
+  fVbty = readBatteryVoltage();
+  fVcc = readSupplyVoltage();
+  bPowerOn = fVcc > fVbty + 0.2;
+  bBadLink = uTxCount >= BAD_TX_COUNT;
+  bCharging = (bPowerOn == true) && (fVbty < fVbtyFull);
 }
 
 
-// report app state
+// report app state (through radio and serial)
 void reportAppState()
 {
-  static unsigned long uRadioTimeoutMs = REPORT_TIMEOUT_MS;
-  static unsigned long uDisplayTimeoutMs = DISPLAY_TIMEOUT_MS;
+  // report app state to HQ
+  auto state = buildAppState();
+  sendRadioMsg(state, APP_ADDR, RFADDR_BRDCST);
 
-  // radio status output
-  if (millis() > uRadioTimeoutMs)
+  // debug
+  if (Serial)
   {
-    uRadioTimeoutMs += REPORT_TIMEOUT_MS + random(REPORT_TIMEOUT_MS/2);
-
-    // report app state to HQ
-    sendRadioMsg(state, APP_ADDR, RFADDR_BRDCST);
-    msgTxCount = min(msgTxCount + 1, 1024);
-
-    // debug
-    if (Serial)
-    {
-      Serial.print("addr=");
-      Serial.print(APP_ADDR, HEX);
-      Serial.print(", chr=");
-      Serial.print(state.m_bCharging ? "yes" : "no");
-      Serial.print(", pwr=");
-      Serial.print(state.m_bPowerOn ? "yes" : "no");
-      Serial.print(", bty=");
-      Serial.print(state.m_fVbty, 2);
-      Serial.print(", vcc=");
-      Serial.print(state.m_fVcc, 2);
-      Serial.print(", lat=");
-      Serial.print(state.m_fLatitudeDeg, 4);
-      Serial.print(", lon=");
-      Serial.print(state.m_fLongitudeDeg, 4);
-      Serial.print(", alt=");
-      Serial.print(state.m_fAltitudeM, 2);
-      Serial.print(", fix=");
-      Serial.print(state.m_bGoodGpsFix);
-      Serial.print(", t=");
-      Serial.print(state.m_uGpsTimeS);
-      Serial.println();
-    }
+    Serial.print(F("addr="));
+    Serial.print(APP_ADDR, HEX);
+    Serial.print(F(", chr="));
+    Serial.print(bCharging ? F("yes") : F("no"));
+    Serial.print(F(", pwr="));
+    Serial.print(bPowerOn ? F("yes") : F("no"));
+    Serial.print(F(", bty="));
+    Serial.print(fVbty, 2);
+    Serial.print(F(", vcc="));
+    Serial.print(fVcc, 2);
+    Serial.print(F(", lat="));
+    Serial.print(fLatitudeDeg, 4);
+    Serial.print(F(", lon="));
+    Serial.print(fLongitudeDeg, 4);
+    Serial.print(F(", fix="));
+    Serial.print(bGoodGpsFix);
+    Serial.print(F(", t="));
+    Serial.print(uGpsTimeS);
+    Serial.println();
   }
+}
 
-  // oled
-  if (millis() > uDisplayTimeoutMs)
-  {
-    uDisplayTimeoutMs += DISPLAY_TIMEOUT_MS;
 
-    clearDisplay();
-    displayMsg(state);  
-    refreshDisplay();
-  }
+// display app state on OLED
+void displayAppState()
+{
+  clearDisplay();
+  
+  auto state = buildAppState();
+  displayMsg(state, uGpsTimeS);  
+  
+  refreshDisplay();
 }
 
 
 // read from lora
-void readLora()
+bool readLora()
 {
+  bool bSuccess = false;
   uint8_t uSrcAddr = 0;
   uint8_t uDstAddr = 0;
+  int iSnr = 0;
 
-  uint8_t n = recvRadioMsg(uSrcAddr, uDstAddr);
-  if ( (n > 0) &&
-       (uDstAddr == APP_ADDR) )
+  unsigned long uLoopTimeout = millis() + RX_TIMEOUT_MS;
+  while ( (millis() < uLoopTimeout) &&
+          (bSuccess == false) )
   {
-    // flash status LED on any message
-    tickOutput(STATUS_TIMEOUT_MS, STATUS_PIN, true, false);
-    
-    // decode messages from HQ
-    if (checkRadioMsgType<HqResponse>(n) == true)
+    uint8_t n = recvRadioMsg(uSrcAddr, uDstAddr, iSnr);
+    if ( (n > 0) &&
+         (uDstAddr == APP_ADDR) )
     {
-      HqResponse response;
-      bool bSuccess = getRadioMsg(response, n);
-      if (bSuccess == true)
+      // flash status LED on any message
+      tickOutput(STATUS_TIMEOUT_MS, STATUS_PIN, true, false);
+      
+      // decode messages from HQ
+      if (checkRadioMsgType<HqResponse>(n) == true)
       {
-        msgTxCount = 0;
+        HqResponse response;
+        bSuccess = getRadioMsg(response, n);
       }
     }
   }
+
+  return bSuccess;
 }
 
 
 /// read and process GPS data
-void readGps()
+bool readGps()
 {
-  static unsigned long uGpsTimeoutMs = GPS_TIMEOUT_MS;
-  static bool gpsGood = false;
+  static unsigned long uGpsTimeoutMs = 0;
   static bool gpsEnabled = false;
-  static int  gpsMsgCount = 0;
+  static int gpsGoodCount = 0;
 
-  // power GPS off and on
-  if ( (gpsGood == false) &&
-       (millis() > uGpsTimeoutMs) )
+  // try to enable GPS after every timeout
+  if (millis() > uGpsTimeoutMs)
   {
-    gpsEnabled = true;
-    gpsMsgCount = 0;
-  }
-  else if ( (gpsEnabled == true) &&
-            (gpsGood == true) )
-  {
-    gpsEnabled = false;
-    gpsGood = false;
+    // flag bad GPS fix if still enabled after timeout
+    if (gpsEnabled == true)
+    {
+      bGoodGpsFix = false;
+    }
+    
     uGpsTimeoutMs = millis() + GPS_TIMEOUT_MS;
+    gpsEnabled = true;
   }
 
   // NOTE: circuit has a PNP resistor controlling power to GPS
@@ -150,26 +204,25 @@ void readGps()
   static NmeaLocation location;
   if (readLocation(location) == true)
   {
-    if (location.m_iTimeS > 0)
-    {
-      state.m_uGpsTimeS = (unsigned long)location.m_iTimeS;
-    }
-      
     if (location.m_bGoodMsg == true)
     {
-      state.m_bGoodGpsFix = true;
-      state.m_fLatitudeDeg = location.m_fLatitudeDeg;
-      state.m_fLongitudeDeg = location.m_fLongitudeDeg;
-      state.m_fAltitudeM = location.m_fAltitudeM;
-      gpsGood = true;
-    }
-    else if (gpsMsgCount > 16)
+      gpsGoodCount++;
+    }      
+    
+    // take GPS fix and reset
+    if (gpsGoodCount >= 2)
     {
-      state.m_bGoodGpsFix = false;
+      fLatitudeDeg = location.m_fLatitudeDeg;
+      fLongitudeDeg = location.m_fLongitudeDeg;
+      uGpsTimeS = (unsigned long)location.m_iTimeS;
+      
+      bGoodGpsFix = true;
+      gpsEnabled = false;
+      gpsGoodCount = 0;
     }
-        
-    gpsMsgCount++;
   }
+
+  return gpsEnabled;
 }
 
 
@@ -192,47 +245,74 @@ void setup()
   setupDisplay();
   setupRadio();
   setupGps();
+  
+  // Timer0 is already used for millis() - just interrupt somewhere to maintain LEDs
+  cli();
+  OCR0A = 0xAF;
+  TIMSK0 |= _BV(OCIE0A);
+  sei();
+
+  // start watchdog
+  wdt_enable(WDTO_8S);
 }
 
 
 void loop()
 {
-  blink(500, 13);
+  static bool bGpsEnabled = false;
+  static unsigned long uReportTimeoutMs = 0;
+  static unsigned long uDisplayTimeoutMs = 0;
   
+  bool bReportState = false;
+  
+  // debug
+  blink(500, 13);
+    
   // read battery voltages, etc.
   updateAppState();
 
-  // update WRN LED
-  if (state.m_bBadLink == true)
+  // read GPS
+  bool bGpsState = readGps();
+  if (bGpsState != bGpsEnabled)
   {
-    blink(1000, WRN_PIN);
-  }
-  else if (state.m_bPowerOn == false)
-  {
-    flash(2000, WRN_PIN);
-  }
-  else if (state.m_bCharging == true)
-  {
-    blink(1000, WRN_PIN);
-  }
-  else if (state.m_bPowerOn == true)
-  {
-    digitalWrite(WRN_PIN, HIGH);
-  }
-  else
-  {
-    digitalWrite(WRN_PIN, LOW);
+    if (bGpsState == false)
+    {
+      bReportState = true;
+    }
+    
+    bGpsEnabled = bGpsState;
   }
 
-  // read external inputs
-  readLora();
-  readGps();
+  // check timeouts
+  if (millis() > uReportTimeoutMs)
+  {
+      bReportState = true;
+  }
 
   // report app state
-  reportAppState();
-  
-  // maintain output timers
-  tickOutput(0, STATUS_PIN, false, false);
+  if (bReportState == true)
+  {
+    reportAppState();
+    uReportTimeoutMs = millis() + REPORT_TIMEOUT_MS + random(REPORT_TIMEOUT_MS/2);
+    
+    if (uTxCount <= BAD_TX_COUNT)
+    {
+      uTxCount++;
+    }
+
+    if (readLora() == true)
+    {
+      uTxCount = 0;
+    }
+    
+    radio.sleep();
+  }
+
+  // maintain OLED state
+  displayAppState();
+
+  // pet the dog
+  wdt_reset();
 }
 
 

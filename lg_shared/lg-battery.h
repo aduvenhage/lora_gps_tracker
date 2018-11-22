@@ -23,7 +23,7 @@ const float           VCC_VSCALE          = 1.002;
 float sampleAnalogPin(int _iPin)
 {
   float fValue = 0;
-  const int n = 8;
+  const int n = 16;
   for (int i = 0; i < n; i++)
   {
     fValue += analogRead(_iPin);
