@@ -37,42 +37,59 @@ uint8_t             uTxCount = 0;
 
 
 
-
-// Interrupt is called once a millisecond -- maintain output LEDs
-SIGNAL(TIMER0_COMPA_vect) 
+// setup timer3 and attach LED timer callback
+void setupLedTimer()
 {
-  static unsigned long count = 0;
-  if (count % 10)
-  {
-    // update WRN LED
-    if (bBadLink == true)
-    {
-      blink(200, WRN_PIN);
-    }
-    else if (bPowerOn == false)
-    {
-      flash(2000, WRN_PIN);
-    }
-    else if (bCharging == true)
-    {
-      blink(1000, WRN_PIN);
-    }
-    else if (bPowerOn == true)
-    {
-      digitalWrite(WRN_PIN, HIGH);
-    }
-    else
-    {
-      digitalWrite(WRN_PIN, LOW);
-    }
-    
-    tickOutput(0, STATUS_PIN, false, false);
-  }
+  const unsigned long CPU_FREQ = 16000000;
+  const unsigned long ISR_FREQ = 100;
   
-  count++;
+  cli(); // disable all interrupts
+  
+  // initialize Timer1
+  TCCR3A = 0;
+  TCCR3B = 0;
+  TCNT3 = 0;
+  
+  OCR3A = CPU_FREQ/256/ISR_FREQ;
+  TCCR3B |= (1 << WGM32);   // CTC mode
+  TCCR3B |= (1 << CS32);    // 256 prescaler
+  TCCR3C = 0; // not forcing output compare
+  TIMSK3 |= (1 << OCIE3A);  // enable timer compare interrupt
+  
+  sei(); // enable all interrupts
 }
 
 
+// LED timer ISR (compare interrupt service routine)
+ISR(TIMER3_COMPA_vect)
+{
+  // update WRN LED
+  if (bBadLink == true)
+  {
+    blink(200, WRN_PIN);
+  }
+  else if (bPowerOn == false)
+  {
+    flash(2000, WRN_PIN);
+  }
+  else if (bCharging == true)
+  {
+    blink(1000, WRN_PIN);
+  }
+  else if (bPowerOn == true)
+  {
+    digitalWrite(WRN_PIN, HIGH);
+  }
+  else
+  {
+    digitalWrite(WRN_PIN, LOW);
+  }
+  
+  tickOutput(0, STATUS_PIN, false, false);
+}
+
+
+// build app state message
 AppState buildAppState()
 {
   AppState state;
@@ -88,10 +105,11 @@ AppState buildAppState()
   return state;
 }
 
+
 // updates application state (read voltages, etc.)
 void updateAppState()
 {
-  const float fVbtyFull = bCharging ? VBTY_FULL : (VBTY_FULL-0.1);
+  const float fVbtyFull = bCharging ? VBTY_FULL : (VBTY_FULL-0.02);
   
   fVbty = readBatteryVoltage();
   fVcc = readSupplyVoltage();
@@ -183,7 +201,6 @@ bool readGps()
 {
   static unsigned long uGpsTimeoutMs = 0;
   static bool gpsEnabled = false;
-  static int gpsGoodCount = 0;
 
   // try to enable GPS after every timeout
   if (millis() > uGpsTimeoutMs)
@@ -204,13 +221,8 @@ bool readGps()
   static NmeaLocation location;
   if (readLocation(location) == true)
   {
-    if (location.m_bGoodMsg == true)
-    {
-      gpsGoodCount++;
-    }      
-    
     // take GPS fix and reset
-    if (gpsGoodCount >= 2)
+    if (location.m_bGoodMsg == true)
     {
       fLatitudeDeg = location.m_fLatitudeDeg;
       fLongitudeDeg = location.m_fLongitudeDeg;
@@ -218,7 +230,6 @@ bool readGps()
       
       bGoodGpsFix = true;
       gpsEnabled = false;
-      gpsGoodCount = 0;
     }
   }
 
@@ -245,13 +256,8 @@ void setup()
   setupDisplay();
   setupRadio();
   setupGps();
+  setupLedTimer();
   
-  // Timer0 is already used for millis() - just interrupt somewhere to maintain LEDs
-  cli();
-  OCR0A = 0xAF;
-  TIMSK0 |= _BV(OCIE0A);
-  sei();
-
   // start watchdog
   wdt_enable(WDTO_8S);
 }

@@ -157,7 +157,7 @@ bool decodeNmeaGpgga(NmeaLocation &_location, const char *_pszNmea, int n)
                 else if (count == 5)
                 {
                     int iFix = strtol(pCh, nullptr, 10);
-                    _location.m_bGoodMsg = (iFix == 1) || (iFix == 2);
+                    _location.m_bGoodMsg = iFix == 1;
                 }
                 else if (count == 8)
                 {

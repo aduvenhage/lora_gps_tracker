@@ -73,6 +73,8 @@ void readLora()
           Serial.print(bPowerOn ? "yes" : "no");
           Serial.print(", fix=");
           Serial.print(bGpsFix ? "yes" : "no");
+          Serial.print(", snr=");
+          Serial.print(iSnr);
           Serial.print(", badlink=");
           Serial.print(bBadLink ? "yes" : "no");
           Serial.println();
