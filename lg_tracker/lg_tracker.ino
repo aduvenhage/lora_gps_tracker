@@ -28,12 +28,13 @@ float               fVbty = 0;
 float               fVcc = 0;
 float               fLongitudeDeg = 0;
 float               fLatitudeDeg = 0;
-bool                bPowerOn = false;
-bool                bCharging = false;
-bool                bBadLink = false;
-bool                bGoodGpsFix = false;
 unsigned long       uGpsTimeS = 0;
 uint8_t             uTxCount = 0;
+
+volatile bool       bPowerOn = false;
+volatile bool       bCharging = false;
+volatile bool       bBadLink = false;
+volatile bool       bGoodGpsFix = false;
 
 
 

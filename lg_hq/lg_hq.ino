@@ -108,7 +108,7 @@ void setup()
   sei();
 
   // start watchdog
-  wdt_enable(WDTO_4S);
+  wdt_enable(WDTO_8S);
 }
 
 
